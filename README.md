@@ -1,4 +1,5 @@
 # BLINKBand - Continuous Glucose Monitoring System
+<img width="1124" height="946" alt="image" src="https://github.com/user-attachments/assets/7a336a2b-6cb2-4041-a6e9-68fff61f3036" />
 
 ## 📋 Project Overview
 **BLINKBand** is a prototype web-based glucose monitoring simulation system developed for the **BLINK Business Plan Competition 2025**. This system demonstrates a continuous glucose monitoring device that processes sensor data in real-time and provides interactive visualization for healthcare monitoring.
