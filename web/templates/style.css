@@ -1,0 +1,338 @@
+/* -------------------------------
+   Background & Font Utama
+------------------------------- */
+body {
+    font-family: 'Roboto', sans-serif !important;
+    background-color: #f8f9fa !important;
+    color: #222 !important;
+    margin: 0;
+    padding: 20px;
+}
+
+/* -------------------------------
+   Sidebar Styling
+------------------------------- */
+.sidebar {
+    background-color: #ac0000 !important;
+    color: white !important;
+    padding: 20px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    width: 320px;
+}
+
+.sidebar h2 {
+    font-family: 'Archivo Black', sans-serif !important;
+    color: #fff !important;
+    text-transform: uppercase;
+    margin-top: 0;
+}
+
+.sidebar label, .sidebar p {
+    color: #fff !important;
+}
+
+.sensor-control {
+    margin: 15px 0;
+}
+
+.sensor-control label {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 14px;
+}
+
+.sensor-control input[type="range"] {
+    width: 100%;
+    height: 25px;
+}
+
+/* -------------------------------
+   Judul
+------------------------------- */
+h1 {
+    font-family: 'Archivo Black', sans-serif !important;
+    color: #3a3a3a !important;
+    text-align: left;
+    margin-top: 0;
+    font-size: 30px;
+}
+
+/* === Tombol utama === */
+button.primary {
+    background-color: #ac0000 !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+    padding: 12px 20px;
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+    width: 100%;
+    margin: 8px 0;
+    font-size: 16px;
+}
+
+button.primary:hover {
+    background-color: #8a0000 !important;
+    transform: translateY(-2px);
+}
+
+button.secondary {
+    background-color: #6c757d !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+    padding: 10px 15px;
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+    width: 100%;
+    margin: 5px 0;
+}
+
+button.active {
+    background-color: #28a745 !important;
+    box-shadow: 0 0 0 2px white, 0 0 0 4px #28a745;
+}
+
+/* -------------------------------
+   Layout
+------------------------------- */
+.container {
+    display: flex;
+    gap: 20px;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.main-content {
+    flex: 1;
+    background-color: #f8f9fa;
+    border-radius: 10px;
+    padding: 20px;
+    min-width: 0;
+}
+
+/* Sensor Data Display */
+.sensor-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 15px;
+    margin: 20px 0;
+}
+
+.sensor-card {
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    text-align: center;
+    min-height: 100px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    transition: transform 0.2s;
+}
+
+.sensor-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.sensor-value {
+    font-size: 28px;
+    font-weight: bold;
+    color: #ac0000;
+    margin: 10px 0;
+}
+
+.sensor-label {
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 5px;
+}
+
+/* Data Source Toggle */
+.data-source-toggle {
+    display: flex;
+    gap: 10px;
+    margin: 20px 0;
+}
+
+.data-source-btn {
+    flex: 1;
+    padding: 12px;
+    text-align: center;
+    background-color: rgba(255,255,255,0.1);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 2px solid transparent;
+}
+
+.data-source-btn:hover {
+    background-color: rgba(255,255,255,0.2);
+}
+
+.data-source-btn.active {
+    background-color: rgba(255,255,255,0.3);
+    border-color: white;
+    font-weight: bold;
+}
+
+/* Chart Container */
+.chart-container {
+    background: white;
+    padding: 25px;
+    border-radius: 12px;
+    margin-top: 25px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+    height: 450px;
+    position: relative;
+}
+
+.chart-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #f0f0f0;
+}
+
+.chart-title h3 {
+    margin: 0;
+    color: #333;
+    font-size: 18px;
+}
+
+.chart-stats {
+    display: flex;
+    gap: 20px;
+    font-size: 14px;
+    color: #666;
+}
+
+.stat-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.stat-value {
+    font-weight: bold;
+    color: #ac0000;
+    font-size: 16px;
+}
+
+/* Status Indicators */
+.status-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.status-online {
+    background-color: rgba(40, 167, 69, 0.1);
+    color: #28a745;
+}
+
+.status-offline {
+    background-color: rgba(220, 53, 69, 0.1);
+    color: #dc3545;
+}
+
+.status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.dot-online {
+    background-color: #28a745;
+    animation: pulse 2s infinite;
+}
+
+.dot-offline {
+    background-color: #dc3545;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+/* Glucose Display */
+.glucose-display {
+    text-align: center;
+    padding: 30px;
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+    border-radius: 12px;
+    margin: 25px 0;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    border: 1px solid #e9ecef;
+}
+
+.glucose-value {
+    font-size: 64px;
+    font-weight: bold;
+    color: #ac0000;
+    margin: 20px 0;
+    text-shadow: 1px 1px 3px rgba(0,0,0,0.1);
+}
+
+/* Notification */
+.notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 15px 20px;
+    border-radius: 10px;
+    color: white;
+    font-weight: bold;
+    z-index: 1000;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+    animation: slideIn 0.3s ease-out;
+    backdrop-filter: blur(10px);
+}
+
+.notification.success {
+    background-color: rgba(40, 167, 69, 0.95);
+}
+
+.notification.error {
+    background-color: rgba(220, 53, 69, 0.95);
+}
+
+.notification.info {
+    background-color: rgba(23, 162, 184, 0.95);
+}
+
+@keyframes slideIn {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes slideOut {
+    from { transform: translateX(0); opacity: 1; }
+    to { transform: translateX(100%); opacity: 0; }
+}
+
+/* Data Info */
+.data-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid #eee;
+    font-size: 13px;
+    color: #666;
+}

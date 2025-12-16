@@ -2,11 +2,12 @@
 let glucoseChart = null;
 let pollInterval = null;
 let currentDataSource = 'manual';
-let isPollingActive = true;
+let esp32LastSeen = null;
+let isPolling = false;
 
 // Initialize Chart
 function initChart() {
-    console.log("📊 Initializing chart...");
+    console.log("Initializing chart...");
     const ctx = document.getElementById('glucoseChart').getContext('2d');
 
     glucoseChart = new Chart(ctx, {
@@ -14,121 +15,47 @@ function initChart() {
         data: {
             labels: [],
             datasets: [{
-                label: 'Glucose Level',
+                label: 'Glucose',
                 data: [],
                 borderColor: '#ac0000',
-                backgroundColor: 'rgba(172, 0, 0, 0.05)',
-                borderWidth: 3,
-                pointBackgroundColor: '#ac0000',
-                pointBorderColor: '#ffffff',
-                pointBorderWidth: 2,
+                backgroundColor: 'rgba(172, 0, 0, 0.1)',
+                borderWidth: 2,
                 pointRadius: 3,
-                pointHoverRadius: 6,
                 fill: true,
-                tension: 0.3,
-                cubicInterpolationMode: 'monotone'
+                tension: 0.3
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            animation: {
-                duration: 300,
-                easing: 'easeOutQuart'
-            },
-            plugins: {
-                legend: {
-                    display: false
-                },
-                tooltip: {
-                    mode: 'index',
-                    intersect: false,
-                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                    titleFont: { size: 13 },
-                    bodyFont: { size: 13 },
-                    padding: 12,
-                    callbacks: {
-                        label: function (context) {
-                            return `Glucose: ${context.parsed.y.toFixed(1)} mg/dL`;
-                        }
-                    }
-                }
-            },
             scales: {
                 y: {
                     beginAtZero: false,
                     min: 50,
                     max: 150,
-                    title: {
-                        display: true,
-                        text: 'Glucose Level (mg/dL)',
-                        font: { size: 14, weight: 'bold', color: '#555' }
-                    },
-                    grid: {
-                        color: 'rgba(0,0,0,0.07)',
-                        drawBorder: false
-                    },
-                    ticks: {
-                        font: { size: 12 },
-                        color: '#666',
-                        padding: 8
-                    }
+                    title: { display: true, text: 'Glucose (mg/dL)' }
                 },
                 x: {
-                    title: {
-                        display: true,
-                        text: 'Time',
-                        font: { size: 14, weight: 'bold', color: '#555' }
-                    },
-                    grid: {
-                        color: 'rgba(0,0,0,0.05)',
-                        drawBorder: false
-                    },
-                    ticks: {
-                        font: { size: 11 },
-                        color: '#666',
-                        maxRotation: 45,
-                        minRotation: 45,
-                        maxTicksLimit: 15
-                    }
-                }
-            },
-            interaction: {
-                intersect: false,
-                mode: 'index'
-            },
-            elements: {
-                line: {
-                    borderCapStyle: 'round'
-                },
-                point: {
-                    hitRadius: 10,
-                    hoverRadius: 8
+                    title: { display: true, text: 'Time' },
+                    ticks: { maxRotation: 45 }
                 }
             }
         }
     });
-    console.log("✅ Chart initialized");
 }
 
 // Set data source
 function setDataSource(source) {
-    if (source === currentDataSource) return;
-
-    console.log(`🔄 Switching data source to: ${source}`);
+    console.log(`Switching to ${source}`);
 
     // Update UI
     document.getElementById('manualSourceBtn').classList.remove('active');
     document.getElementById('esp32SourceBtn').classList.remove('active');
     document.getElementById(source + 'SourceBtn').classList.add('active');
 
-    // Show/hide manual controls
-    const manualControls = document.getElementById('manualControls');
-    if (source === 'manual') {
-        manualControls.style.display = 'block';
-    } else {
-        manualControls.style.display = 'none';
-    }
+    // Show/hide controls
+    document.getElementById('manualControls').style.display =
+        source === 'manual' ? 'block' : 'none';
 
     // Update server
     fetch('/api/set-data-source', {
@@ -136,195 +63,238 @@ function setDataSource(source) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ data_source: source })
     })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            currentDataSource = source;
+            console.log(`Now showing ${source} data`);
+
+            // Force immediate poll when switching to ESP32 mode
+            if (source === 'esp32') {
+                setTimeout(pollForData, 100);
+            }
+        }
+    });
+}
+
+// Start polling
+function startPolling() {
+    console.log("Starting 1-second polling...");
+
+    // Clear old interval
+    if (pollInterval) clearInterval(pollInterval);
+
+    isPolling = true;
+
+    // Immediate first poll
+    pollForData();
+
+    // Poll every 1000ms (1 second)
+    pollInterval = setInterval(pollForData, 1000);
+}
+
+// Poll for data
+function pollForData() {
+    if (!isPolling) return;
+
+    fetch('/api/get-current-data')
         .then(response => response.json())
         .then(data => {
             if (data.status === 'success') {
-                currentDataSource = source;
-                document.getElementById('dataSourceInfo').innerHTML =
-                    `Data Source: <b>${source === 'manual' ? 'Manual Input' : 'ESP32 Live'}</b>`;
-
-                showNotification(`Switched to ${source === 'manual' ? 'Manual Input' : 'ESP32 Live Data'}`, 'info');
-
-                // Force immediate update
-                pollForUpdates();
+                // Update everything
+                updateDisplay(data);
             }
         })
         .catch(error => {
-            console.error('Error switching data source:', error);
+            console.error("Poll error:", error);
         });
 }
 
-// Continuous polling for updates
-function startPolling() {
-    console.log('🔄 Starting continuous polling (1 second interval)...');
+// Update display
+function updateDisplay(data) {
+    // Update sensor values
+    document.getElementById('currentRed').textContent =
+        data.sensor_values.red_signal.toFixed(2);
+    document.getElementById('currentIr').textContent =
+        data.sensor_values.ir_signal.toFixed(2);
+    document.getElementById('currentTemp').textContent =
+        data.sensor_values.temperature.toFixed(1);
+    document.getElementById('currentMotion').textContent =
+        data.sensor_values.motion.toFixed(2);
 
-    // Clear any existing interval
-    if (pollInterval) {
-        clearInterval(pollInterval);
-    }
-
-    // Immediate first poll
-    pollForUpdates();
-
-    // Continuous polling every 1 second
-    pollInterval = setInterval(pollForUpdates, 1000);
-
-    console.log('✅ Continuous polling started');
-}
-
-// Poll for updates
-function pollForUpdates() {
-    if (!isPollingActive) return;
-
-    fetch('/api/get-current-data')
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-            }
-            return response.json();
-        })
-        .then(data => {
-            if (data.status === 'success') {
-                // Update all displays
-                updateSensorDisplays(data.sensor_values);
-                updateGlucoseChart(data.glucose_data, data.y_range);
-                updateChartStats(data.glucose_data);
-                updateStatusDisplay(data);
-
-                // Update data points info
-                document.getElementById('dataPointsInfo').innerHTML =
-                    `Points: <b>${data.data_count}/30</b>`;
-            }
-        })
-        .catch(error => {
-            console.error('❌ Poll error:', error);
-            // Don't stop polling on error
-        });
-}
-
-// Update sensor displays
-function updateSensorDisplays(sensorData) {
-    // Update current values display
-    document.getElementById('currentRed').textContent = sensorData.red_signal.toFixed(2);
-    document.getElementById('currentIR').textContent = sensorData.ir_signal.toFixed(2);
-    document.getElementById('currentTemp').textContent = sensorData.temperature.toFixed(1);
-    document.getElementById('currentMotion').textContent = sensorData.motion.toFixed(2);
-
-    // Only update sliders in manual mode
+    // Update sliders if in manual mode
     if (currentDataSource === 'manual') {
-        document.getElementById('redSlider').value = sensorData.red_signal;
-        document.getElementById('irSlider').value = sensorData.ir_signal;
-        document.getElementById('tempSlider').value = sensorData.temperature;
-        document.getElementById('motionSlider').value = sensorData.motion;
+        document.getElementById('redSlider').value = data.sensor_values.red_signal;
+        document.getElementById('irSlider').value = data.sensor_values.ir_signal;
+        document.getElementById('tempSlider').value = data.sensor_values.temperature;
+        document.getElementById('motionSlider').value = data.sensor_values.motion;
 
-        document.getElementById('redValue').textContent = sensorData.red_signal.toFixed(2);
-        document.getElementById('irValue').textContent = sensorData.ir_signal.toFixed(2);
-        document.getElementById('tempValue').textContent = sensorData.temperature.toFixed(1);
-        document.getElementById('motionValue').textContent = sensorData.motion.toFixed(2);
-    }
-}
-
-// Update glucose chart with dynamic Y-axis
-function updateGlucoseChart(history, yRange) {
-    if (!history || history.length === 0) {
-        // Keep existing data if no new data
-        return;
-    }
-
-    const labels = history.map(d => d.Time);
-    const glucoseValues = history.map(d => d.Glucose);
-
-    // Update chart data
-    glucoseChart.data.labels = labels;
-    glucoseChart.data.datasets[0].data = glucoseValues;
-
-    // Update current glucose display
-    const latest = history[history.length - 1];
-    document.getElementById('currentGlucose').textContent = latest.Glucose.toFixed(1);
-    document.getElementById('chartCurrent').textContent = latest.Glucose.toFixed(1);
-    document.getElementById('currentTime').textContent = `Time: ${latest.Time}`;
-
-    // Update Y-axis range dynamically
-    if (yRange) {
-        glucoseChart.options.scales.y.min = yRange.min;
-        glucoseChart.options.scales.y.max = yRange.max;
-
-        // Update range display
-        document.getElementById('chartRange').textContent =
-            `Y-axis: ${yRange.min.toFixed(0)} - ${yRange.max.toFixed(0)} mg/dL`;
+        document.getElementById('redValue').textContent = data.sensor_values.red_signal.toFixed(2);
+        document.getElementById('irValue').textContent = data.sensor_values.ir_signal.toFixed(2);
+        document.getElementById('tempValue').textContent = data.sensor_values.temperature.toFixed(1);
+        document.getElementById('motionValue').textContent = data.sensor_values.motion.toFixed(2);
     }
 
     // Update chart
-    glucoseChart.update();
+    if (data.glucose_data && data.glucose_data.length > 0) {
+        const labels = data.glucose_data.map(d => d.Time);
+        const values = data.glucose_data.map(d => d.Glucose);
 
-    // Update last update time
+        glucoseChart.data.labels = labels;
+        glucoseChart.data.datasets[0].data = values;
+
+        // Update Y-axis
+        if (data.y_range) {
+            glucoseChart.options.scales.y.min = data.y_range.min;
+            glucoseChart.options.scales.y.max = data.y_range.max;
+            document.getElementById('chartRange').textContent =
+                `Range: ${data.y_range.min.toFixed(0)}-${data.y_range.max.toFixed(0)} mg/dL`;
+        }
+
+        glucoseChart.update();
+
+        // Update current glucose
+        const latest = data.glucose_data[data.glucose_data.length-1];
+        document.getElementById('currentGlucose').textContent = latest.Glucose.toFixed(1);
+        document.getElementById('currentTime').textContent = `Time: ${latest.Time}`;
+        document.getElementById('chartCurrent').textContent = latest.Glucose.toFixed(1);
+
+        // Update stats
+        if (values.length > 0) {
+            document.getElementById('chartMin').textContent = Math.min(...values).toFixed(1);
+            document.getElementById('chartMax').textContent = Math.max(...values).toFixed(1);
+            const avg = values.reduce((a,b) => a+b, 0) / values.length;
+            document.getElementById('chartAvg').textContent = avg.toFixed(1);
+        }
+    }
+
+    // Update status - FIXED: Manual mode should NOT show connection status
+    updateStatus(data);
+
+    // Update info
+    document.getElementById('dataSourceInfo').innerHTML =
+        `Source: <b>${data.data_source === 'manual' ? 'Manual' : 'ESP32'}</b>`;
+    document.getElementById('dataPointsInfo').innerHTML =
+        `Points: <b>${data.data_count}/30</b>`;
     document.getElementById('updateTime').textContent =
-        `Last update: ${new Date().toLocaleTimeString()}`;
+        `Updated: ${data.timestamp}`;
 }
 
-// Update chart statistics
-function updateChartStats(history) {
-    if (!history || history.length === 0) return;
-
-    const glucoseValues = history.map(d => d.Glucose);
-    const minValue = Math.min(...glucoseValues);
-    const maxValue = Math.max(...glucoseValues);
-    const avgValue = glucoseValues.reduce((a, b) => a + b, 0) / glucoseValues.length;
-
-    document.getElementById('chartMin').textContent = minValue.toFixed(1);
-    document.getElementById('chartMax').textContent = maxValue.toFixed(1);
-    document.getElementById('chartAvg').textContent = avgValue.toFixed(1);
-}
-
-// Update status display
-function updateStatusDisplay(data) {
-    const statusIndicator = document.getElementById('statusIndicator');
+// Update status - FIXED LOGIC
+function updateStatus(data) {
+    const statusElem = document.getElementById('statusIndicator');
     const statusText = document.getElementById('statusText');
     const lastUpdate = document.getElementById('lastUpdate');
     const bufferInfo = document.getElementById('bufferInfo');
 
-    // Update connection status
-    if (data.sensor_values.device_connected) {
-        statusIndicator.className = 'status-indicator status-online';
-        statusIndicator.querySelector('.status-dot').className = 'status-dot dot-online';
-        statusText.textContent = 'ESP32 Connected';
+    // MANUAL MODE: Just show "Manual Mode" - no connection status!
+    if (data.data_source === 'manual') {
+        statusElem.className = 'status-indicator status-offline';
+        statusElem.querySelector('.status-dot').className = 'status-dot';
+        statusText.textContent = 'Manual Mode';
+        lastUpdate.textContent = 'Using manual input';
+    }
+    // ESP32 MODE: Check connection based on sensor_values.device_connected
+    else if (data.data_source === 'esp32') {
+        // Check if server says device is connected
+        if (data.sensor_values.device_connected === true) {
+            statusElem.className = 'status-indicator status-online';
+            statusElem.querySelector('.status-dot').className = 'status-dot dot-online';
+            statusText.textContent = 'ESP32 Connected';
+            lastUpdate.textContent = 'Receiving live data';
 
-        if (data.sensor_values.last_update) {
-            try {
-                const lastUpdateTime = new Date(data.sensor_values.last_update);
-                lastUpdate.textContent = `Last ESP32 data: ${lastUpdateTime.toLocaleTimeString()}`;
-            } catch (e) {
-                lastUpdate.textContent = 'Last ESP32 data: Just now';
+            // Update our local timestamp
+            esp32LastSeen = new Date();
+        }
+        // Check if we have a local timestamp (from previous ESP32 data)
+        else if (esp32LastSeen) {
+            const now = new Date();
+            const secondsSinceLastSeen = (now - esp32LastSeen) / 1000;
+
+            if (secondsSinceLastSeen < 15) { // Recently connected
+                statusElem.className = 'status-indicator status-online';
+                statusElem.querySelector('.status-dot').className = 'status-dot dot-online';
+                statusText.textContent = 'ESP32 Connected';
+                lastUpdate.textContent = `Last data: ${Math.floor(secondsSinceLastSeen)}s ago`;
+            } else if (secondsSinceLastSeen < 60) { // Connection lost
+                statusElem.className = 'status-indicator status-offline';
+                statusElem.querySelector('.status-dot').className = 'status-dot dot-offline';
+                statusText.textContent = 'ESP32 Connection Lost';
+                lastUpdate.textContent = `Last seen: ${Math.floor(secondsSinceLastSeen)}s ago`;
+            } else { // No recent data
+                statusElem.className = 'status-indicator status-offline';
+                statusElem.querySelector('.status-dot').className = 'status-dot dot-offline';
+                statusText.textContent = 'Waiting for ESP32';
+                lastUpdate.textContent = 'No recent data';
             }
         }
-    } else {
-        statusIndicator.className = 'status-indicator status-offline';
-        statusIndicator.querySelector('.status-dot').className = 'status-dot dot-offline';
-        statusText.textContent = 'Manual Mode';
-        lastUpdate.textContent = currentDataSource === 'manual' ? 'Using manual input' : 'Waiting for ESP32...';
+        // Never received ESP32 data
+        else {
+            statusElem.className = 'status-indicator status-offline';
+            statusElem.querySelector('.status-dot').className = 'status-dot dot-offline';
+            statusText.textContent = 'Waiting for ESP32';
+            lastUpdate.textContent = 'No data received yet';
+        }
     }
 
-    // Update buffer info
-    bufferInfo.textContent = `Buffer: ${data.data_count}/30 points`;
+    bufferInfo.textContent = `Buffer: ${data.data_count}/30`;
 }
 
-// Update sensor via sliders (manual mode only)
+// Update ESP32 connection when data is received
+function updateESP32Connection() {
+    console.log("ESP32 data received - updating connection status");
+    esp32LastSeen = new Date();
+
+    // If we're in ESP32 mode, force a poll to update the status
+    if (currentDataSource === 'esp32') {
+        setTimeout(pollForData, 100);
+    }
+}
+
+// Listen for ESP32 data responses
+function setupESP32ResponseListener() {
+    // Override fetch to detect ESP32 API calls
+    const originalFetch = window.fetch;
+    window.fetch = function(...args) {
+        const url = args[0];
+        const options = args[1] || {};
+
+        // Check if this is an ESP32 data submission
+        if (typeof url === 'string' && url.includes('/api/sensor-data') &&
+            options.method === 'POST') {
+
+            return originalFetch.apply(this, args).then(response => {
+                return response.clone().json().then(data => {
+                    // If ESP32 data was successfully received
+                    if (data.status === 'success') {
+                        console.log("ESP32 data accepted by server");
+                        updateESP32Connection();
+                    }
+                    return response;
+                }).catch(() => response);
+            });
+        }
+
+        return originalFetch.apply(this, args);
+    };
+
+    console.log("ESP32 response listener setup complete");
+}
+
+// Update sensor via slider
 function updateSensor(type, value) {
     if (currentDataSource !== 'manual') return;
 
     const numValue = parseFloat(value);
 
     // Update display
-    document.getElementById(`${type}Value`).textContent =
-        type === 'temperature' ? numValue.toFixed(1) : numValue.toFixed(2);
+    const displayValue = type === 'temperature' ? numValue.toFixed(1) : numValue.toFixed(2);
+    document.getElementById(`${type}Value`).textContent = displayValue;
+    document.getElementById(`current${type.charAt(0).toUpperCase() + type.slice(1)}`).textContent = displayValue;
 
-    document.getElementById(`current${type.charAt(0).toUpperCase() + type.slice(1)}`).textContent =
-        type === 'temperature' ? numValue.toFixed(1) : numValue.toFixed(2);
-
-    // Send update to server
+    // Send to server
     const payload = {};
-    const key = type === 'temperature' ? 'temperature' : `${type}_signal`;
-    payload[key] = numValue;
+    payload[type === 'temperature' ? 'temperature' : `${type}_signal`] = numValue;
 
     fetch('/api/update-sensors', {
         method: 'POST',
@@ -333,22 +303,22 @@ function updateSensor(type, value) {
     });
 }
 
-// Clear current buffer
+// Clear buffer
 function clearCurrentBuffer() {
-    if (confirm(`Clear all data in ${currentDataSource} buffer?`)) {
+    if (confirm(`Clear ${currentDataSource} data?`)) {
         fetch('/api/clear-buffer', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ buffer_name: currentDataSource })
         })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    showNotification(`Cleared ${currentDataSource} buffer`, 'info');
-                    // Force immediate update to refresh chart
-                    pollForUpdates();
-                }
-            });
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                console.log("Buffer cleared");
+                // Refresh display
+                pollForData();
+            }
+        });
     }
 }
 
@@ -357,54 +327,81 @@ function downloadCSV() {
     window.location.href = '/api/download-csv';
 }
 
-// Show notification
-function showNotification(message, type) {
-    console.log(`💬 ${type.toUpperCase()}: ${message}`);
+// Send test ESP32 data
+function sendTestESP32Data() {
+    const testData = {
+        red_signal: 0.65 + Math.random() * 0.1,
+        ir_signal: 0.72 + Math.random() * 0.1,
+        temperature: 36.8 + Math.random() * 0.5,
+        motion: 0.25 + Math.random() * 0.2
+    };
 
-    // Remove existing notification
-    const existing = document.querySelector('.notification');
-    if (existing) existing.remove();
+    console.log("Sending test ESP32 data:", testData);
 
-    // Create new notification
-    const notification = document.createElement('div');
-    notification.className = `notification ${type}`;
-    notification.textContent = message;
-    document.body.appendChild(notification);
+    fetch('/api/sensor-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(testData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            console.log("✅ Test ESP32 data sent successfully");
+            alert(`ESP32 test data sent!\nResponse: ${data.message}`);
 
-    // Auto-remove after 3 seconds
-    setTimeout(() => {
-        if (notification.parentNode) {
-            notification.style.animation = 'slideOut 0.3s ease-out';
-            setTimeout(() => notification.remove(), 300);
+            // Force status update
+            updateESP32Connection();
+        } else {
+            console.error("❌ Failed to send ESP32 data:", data.message);
+            alert(`Failed: ${data.message}`);
         }
-    }, 3000);
+    })
+    .catch(error => {
+        console.error("❌ Network error:", error);
+        alert("Network error sending ESP32 data");
+    });
 }
 
-// Initialize everything
-document.addEventListener('DOMContentLoaded', function () {
-    console.log('🚀 BLINKBand Continuous Monitoring loading...');
+// Initialize
+document.addEventListener('DOMContentLoaded', function() {
+    console.log("Starting BLINKBand...");
 
     // Initialize chart
     initChart();
 
-    // Set initial sensor values
+    // Set up ESP32 response listener
+    setupESP32ResponseListener();
+
+    // Set initial values
     updateSensor('red', 0.6);
     updateSensor('ir', 0.7);
-    updateSensor('temperature', 36.5);
+    updateSensor('temp', 36.5);
     updateSensor('motion', 0.3);
 
-    // Set initial data source
+    // Set to manual mode
     setDataSource('manual');
 
-    // Start continuous polling
-    startPolling();
+    // Start polling after 1 second
+    setTimeout(startPolling, 1000);
 
-    console.log('✅ BLINKBand Continuous Monitoring loaded');
+    console.log("System ready!");
 
-    // Initial status check
-    fetch('/api/health')
-        .then(response => response.json())
-        .then(data => {
-            console.log('🏥 System health:', data);
-        });
+    // Add test button for ESP32
+    const testBtn = document.createElement('button');
+    testBtn.className = 'secondary';
+    testBtn.innerHTML = '🔧 Test ESP32 Connection';
+    testBtn.onclick = sendTestESP32Data;
+    testBtn.style.marginTop = '10px';
+    document.querySelector('.sidebar').appendChild(testBtn);
+
+    // Add manual refresh button
+    const refreshBtn = document.createElement('button');
+    refreshBtn.className = 'secondary';
+    refreshBtn.innerHTML = '🔄 Force Refresh';
+    refreshBtn.onclick = function() {
+        console.log("Manual refresh requested");
+        pollForData();
+    };
+    refreshBtn.style.marginTop = '5px';
+    document.querySelector('.sidebar').appendChild(refreshBtn);
 });
