@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BLINKBand - Continuous Glucose Monitoring</title>
+    <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Roboto&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* -------------------------------
+           Background & Font Utama
+        ------------------------------- */
+        body {
+            font-family: 'Roboto', sans-serif !important;
+            background-color: #f8f9fa !important;
+            color: #222 !important;
+            margin: 0;
+            padding: 20px;
+        }
+
+        /* -------------------------------
+           Sidebar Styling
+        ------------------------------- */
+        .sidebar {
+            background-color: #ac0000 !important;
+            color: white !important;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            width: 320px;
+        }
+
+        .sidebar h2 {
+            font-family: 'Archivo Black', sans-serif !important;
+            color: #fff !important;
+            text-transform: uppercase;
+            margin-top: 0;
+        }
+
+        .sidebar label, .sidebar p {
+            color: #fff !important;
+        }
+
+        .sensor-control {
+            margin: 15px 0;
+        }
+
+        .sensor-control label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+
+        .sensor-control input[type="range"] {
+            width: 100%;
+            height: 25px;
+        }
+
+        /* -------------------------------
+           Judul
+        ------------------------------- */
+        h1 {
+            font-family: 'Archivo Black', sans-serif !important;
+            color: #3a3a3a !important;
+            text-align: left;
+            margin-top: 0;
+            font-size: 30px;
+        }
+
+        /* === Tombol utama === */
+        button.primary {
+            background-color: #ac0000 !important;
+            color: white !important;
+            border: none !important;
+            border-radius: 8px !important;
+            font-weight: 600 !important;
+            padding: 12px 20px;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            width: 100%;
+            margin: 8px 0;
+            font-size: 16px;
+        }
+
+        button.primary:hover {
+            background-color: #8a0000 !important;
+            transform: translateY(-2px);
+        }
+
+        button.secondary {
+            background-color: #6c757d !important;
+            color: white !important;
+            border: none !important;
+            border-radius: 8px !important;
+            font-weight: 600 !important;
+            padding: 10px 15px;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            width: 100%;
+            margin: 5px 0;
+        }
+
+        button.active {
+            background-color: #28a745 !important;
+            box-shadow: 0 0 0 2px white, 0 0 0 4px #28a745;
+        }
+
+        /* -------------------------------
+           Layout
+        ------------------------------- */
+        .container {
+            display: flex;
+            gap: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .main-content {
+            flex: 1;
+            background-color: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            min-width: 0;
+        }
+
+        /* Sensor Data Display */
+        .sensor-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .sensor-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            text-align: center;
+            min-height: 100px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            transition: transform 0.2s;
+        }
+
+        .sensor-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .sensor-value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #ac0000;
+            margin: 10px 0;
+        }
+
+        .sensor-label {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        /* Data Source Toggle */
+        .data-source-toggle {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+        }
+
+        .data-source-btn {
+            flex: 1;
+            padding: 12px;
+            text-align: center;
+            background-color: rgba(255,255,255,0.1);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 2px solid transparent;
+        }
+
+        .data-source-btn:hover {
+            background-color: rgba(255,255,255,0.2);
+        }
+
+        .data-source-btn.active {
+            background-color: rgba(255,255,255,0.3);
+            border-color: white;
+            font-weight: bold;
+        }
+
+        /* Chart Container */
+        .chart-container {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            margin-top: 25px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+            height: 450px;
+            position: relative;
+        }
+
+        .chart-title {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .chart-title h3 {
+            margin: 0;
+            color: #333;
+            font-size: 18px;
+        }
+
+        .chart-stats {
+            display: flex;
+            gap: 20px;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .stat-value {
+            font-weight: bold;
+            color: #ac0000;
+            font-size: 16px;
+        }
+
+        /* Status Indicators */
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .status-online {
+            background-color: rgba(40, 167, 69, 0.1);
+            color: #28a745;
+        }
+
+        .status-offline {
+            background-color: rgba(220, 53, 69, 0.1);
+            color: #dc3545;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .dot-online {
+            background-color: #28a745;
+            animation: pulse 2s infinite;
+        }
+
+        .dot-offline {
+            background-color: #dc3545;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        /* Glucose Display */
+        .glucose-display {
+            text-align: center;
+            padding: 30px;
+            background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+            border-radius: 12px;
+            margin: 25px 0;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            border: 1px solid #e9ecef;
+        }
+
+        .glucose-value {
+            font-size: 64px;
+            font-weight: bold;
+            color: #ac0000;
+            margin: 20px 0;
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.1);
+        }
+
+        /* Notification */
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            border-radius: 10px;
+            color: white;
+            font-weight: bold;
+            z-index: 1000;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+            animation: slideIn 0.3s ease-out;
+            backdrop-filter: blur(10px);
+        }
+
+        .notification.success {
+            background-color: rgba(40, 167, 69, 0.95);
+        }
+
+        .notification.error {
+            background-color: rgba(220, 53, 69, 0.95);
+        }
+
+        .notification.info {
+            background-color: rgba(23, 162, 184, 0.95);
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        @keyframes slideOut {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(100%); opacity: 0; }
+        }
+
+        /* Data Info */
+        .data-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #eee;
+            font-size: 13px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <h2>BLINKBand Control</h2>
+
+            <!-- Data Source Selection -->
+            <div class="sensor-control">
+                <label>Data Source:</label>
+                <div class="data-source-toggle">
+                    <div class="data-source-btn active" id="manualSourceBtn" onclick="setDataSource('manual')">
+                        📱 Manual Input
+                    </div>
+                    <div class="data-source-btn" id="esp32SourceBtn" onclick="setDataSource('esp32')">
+                        📡 ESP32 Live
+                    </div>
+                </div>
+            </div>
+
+            <!-- Manual Controls (only visible in manual mode) -->
+            <div id="manualControls">
+                <div class="sensor-control">
+                    <label>Red Signal: <span id="redValue">0.60</span></label>
+                    <input type="range" id="redSlider" min="0" max="1" step="0.01" value="0.6"
+                           oninput="updateSensor('red', this.value)">
+                </div>
+
+                <div class="sensor-control">
+                    <label>IR Signal: <span id="irValue">0.70</span></label>
+                    <input type="range" id="irSlider" min="0" max="1" step="0.01" value="0.7"
+                           oninput="updateSensor('ir', this.value)">
+                </div>
+
+                <div class="sensor-control">
+                    <label>Temperature: <span id="tempValue">36.5</span>°C</label>
+                    <input type="range" id="tempSlider" min="30" max="40" step="0.1" value="36.5"
+                           oninput="updateSensor('temperature', this.value)">
+                </div>
+
+                <div class="sensor-control">
+                    <label>Motion Activity: <span id="motionValue">0.30</span></label>
+                    <input type="range" id="motionSlider" min="0" max="1" step="0.01" value="0.3"
+                           oninput="updateSensor('motion', this.value)">
+                </div>
+            </div>
+
+            <!-- Device Status -->
+            <div id="deviceStatus" style="margin: 25px 0; padding: 20px; background: rgba(255,255,255,0.1); border-radius: 8px;">
+                <strong style="display: block; margin-bottom: 10px;">📡 Connection Status</strong>
+                <div class="status-indicator" id="statusIndicator">
+                    <span class="status-dot dot-offline"></span>
+                    <span id="statusText">Waiting for connection...</span>
+                </div>
+                <div id="lastUpdate" style="font-size: 12px; margin-top: 10px; color: rgba(255,255,255,0.8);"></div>
+                <div id="bufferInfo" style="font-size: 12px; margin-top: 5px; color: rgba(255,255,255,0.8);"></div>
+            </div>
+
+            <!-- Control Buttons -->
+            <div style="margin: 25px 0;">
+                <button class="primary" onclick="clearCurrentBuffer()">
+                    🧹 Clear Current Data
+                </button>
+                <button class="primary" onclick="downloadCSV()" style="margin-top: 10px;">
+                    📥 Download CSV
+                </button>
+            </div>
+
+            <!-- Footer -->
+            <div style="margin-top: 25px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.2);">
+                <div style="font-size: 12px; color: rgba(255,255,255,0.7);">
+                    <p>made by <b>Dhimas Adjie Pradayan,</b> powered by <b>Python</b> via <b>Flask</b></p>
+                    <p style="margin-top: 5px; font-size: 11px;">Continuous Glucose Monitoring System</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <h1>BLINKBand - Continuous Glucose Monitoring</h1>
+
+            <p style="color: #767676; font-size: 18px; margin-top: -10px; margin-bottom: 25px;">
+                Real-time glucose monitoring with dual data source support
+            </p>
+
+            <!-- Current Sensor Data -->
+            <div class="sensor-grid">
+                <div class="sensor-card">
+                    <div class="sensor-label">Red Signal</div>
+                    <div class="sensor-value" id="currentRed">0.60</div>
+                    <div style="font-size: 12px; color: #666;">Normalized</div>
+                </div>
+                <div class="sensor-card">
+                    <div class="sensor-label">IR Signal</div>
+                    <div class="sensor-value" id="currentIR">0.70</div>
+                    <div style="font-size: 12px; color: #666;">Normalized</div>
+                </div>
+                <div class="sensor-card">
+                    <div class="sensor-label">Temperature</div>
+                    <div class="sensor-value" id="currentTemp">36.5</div>
+                    <div style="font-size: 12px; color: #666;">°C</div>
+                </div>
+                <div class="sensor-card">
+                    <div class="sensor-label">Motion</div>
+                    <div class="sensor-value" id="currentMotion">0.30</div>
+                    <div style="font-size: 12px; color: #666;">Activity</div>
+                </div>
+            </div>
+
+            <!-- Glucose Display -->
+            <div class="glucose-display">
+                <h2 style="color: #d62828; margin-top: 0; font-size: 24px;">Current Glucose Level</h2>
+                <div class="glucose-value" id="currentGlucose">--.-</div>
+                <div style="color: #666; font-size: 16px; margin: 10px 0;" id="currentTime">Time: --:--:--</div>
+                <div class="data-info">
+                    <span id="dataSourceInfo">Data Source: <b>Manual Input</b></span>
+                    <span id="dataPointsInfo">Points: <b>0/30</b></span>
+                </div>
+            </div>
+
+            <!-- Chart -->
+            <div class="chart-container">
+                <div class="chart-title">
+                    <h3>Glucose Level Over Time</h3>
+                    <div class="chart-stats">
+                        <div class="stat-item">
+                            <span class="stat-label">Current</span>
+                            <span class="stat-value" id="chartCurrent">--.-</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Min</span>
+                            <span class="stat-value" id="chartMin">--.-</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Max</span>
+                            <span class="stat-value" id="chartMax">--.-</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Avg</span>
+                            <span class="stat-value" id="chartAvg">--.-</span>
+                        </div>
+                    </div>
+                </div>
+                <canvas id="glucoseChart"></canvas>
+                <div class="data-info">
+                    <span id="chartRange">Y-axis: 50 - 150 mg/dL</span>
+                    <span id="updateTime">Last update: --:--:--</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+{
+	"folders": [
+		{
+			"name": "Sugar Level Meter",
+			"path": ".."
+		}
+	],
+	"settings": {
+		"Codegeex.GenerationPreference": "line by line"
+	}
+}
